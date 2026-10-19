@@ -6,7 +6,7 @@
 #include "ui/Knob.h"
 #include "ui/Theme.h"
 
-class ResonanceSuppressorEditor final : public juce::AudioProcessorEditor
+class ResonanceSuppressorEditor final : public juce::AudioProcessorEditor, private juce::Timer
 {
 public:
     explicit ResonanceSuppressorEditor (ResonanceSuppressorProcessor&);
@@ -14,12 +14,19 @@ public:
 
     void paint (juce::Graphics&) override;
     void resized() override;
+    void mouseDown (const juce::MouseEvent&) override;
+    bool keyPressed (const juce::KeyPress&) override;
 
 private:
     using ButtonAttachment = juce::AudioProcessorValueTreeState::ButtonAttachment;
     using ComboAttachment = juce::AudioProcessorValueTreeState::ComboBoxAttachment;
 
     void addToggle (juce::ToggleButton&, std::unique_ptr<ButtonAttachment>&, const char* paramId, const juce::String& text, bool accent = false);
+    void addButton (juce::TextButton&, const juce::String& text, const juce::String& tooltip, std::function<void()> onClick);
+    void timerCallback() override;
+    void refreshPresetList();
+    void savePresetDialog();
+    void refreshAB();
 
     ResonanceSuppressorProcessor& processor;
     rs::ui::LookAndFeel lnf;
@@ -28,8 +35,14 @@ private:
     rs::ui::Analyzer analyzer;
     rs::ui::BandOverlay bandOverlay;
 
-    // Header
+    // Header: presets, A/B, undo
+    juce::ComboBox presetBox;
+    juce::TextButton saveButton, deleteButton, aButton, bButton, copyButton, undoButton, redoButton;
+    std::unique_ptr<juce::AlertWindow> saveDialog;
+
+    // Toolbar
     juce::ToggleButton softButton, hardButton, linearButton, lowLatencyButton, deltaButton, bypassButton, panelButton;
+    std::unique_ptr<juce::ParameterAttachment> modeAttachment;
     std::unique_ptr<ButtonAttachment> linearAttachment, lowLatencyAttachment, deltaAttachment, bypassAttachment;
     juce::ComboBox qualityBox;
     std::unique_ptr<ComboAttachment> qualityAttachment;

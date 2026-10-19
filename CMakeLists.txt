@@ -42,6 +42,7 @@ juce_add_plugin(ResonanceSuppressor
 
 target_sources(ResonanceSuppressor PRIVATE
     src/plugin/Parameters.cpp
+    src/plugin/Presets.cpp
     src/plugin/PluginProcessor.cpp
     src/plugin/PluginEditor.cpp
     src/plugin/ui/Theme.cpp

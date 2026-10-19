@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 
 #include "Parameters.h"
+#include "Presets.h"
 #include "dsp/Suppressor.h"
 
 class ResonanceSuppressorProcessor final : public juce::AudioProcessor
@@ -35,11 +36,20 @@ public:
     void getStateInformation (juce::MemoryBlock& destData) override;
     void setStateInformation (const void* data, int sizeInBytes) override;
 
+    // A/B comparison: two complete parameter states; the inactive one is kept here.
+    int getActiveSlot() const { return activeSlot; }
+    void switchToSlot (int slot);
+    void copyActiveToOther();
+
+    juce::UndoManager undoManager;
     juce::AudioProcessorValueTreeState apvts;
+    rs::PresetManager presets { apvts };
     rs::Suppressor suppressor;
 
 private:
     rs::ParameterReader parameters { apvts };
+    std::array<juce::ValueTree, 2> slots;
+    int activeSlot = 0;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (ResonanceSuppressorProcessor)
 };

@@ -6,7 +6,7 @@ ResonanceSuppressorProcessor::ResonanceSuppressorProcessor()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                           .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)),
-      apvts (*this, nullptr, "STATE", rs::createParameterLayout())
+      apvts (*this, &undoManager, "STATE", rs::createParameterLayout())
 {
 }
 
@@ -59,17 +59,59 @@ juce::AudioProcessorEditor* ResonanceSuppressorProcessor::createEditor()
     return new ResonanceSuppressorEditor (*this);
 }
 
+void ResonanceSuppressorProcessor::switchToSlot (int slot)
+{
+    if (slot == activeSlot)
+        return;
+    slots[(size_t) activeSlot] = apvts.copyState();
+    if (slots[(size_t) slot].isValid())
+        apvts.replaceState (slots[(size_t) slot].createCopy());
+    activeSlot = slot;
+}
+
+void ResonanceSuppressorProcessor::copyActiveToOther()
+{
+    slots[(size_t) (1 - activeSlot)] = apvts.copyState();
+}
+
+// State layout: <RS activeSlot=".." preset=".."> <STATE .../> <SLOT><STATE .../></SLOT> </RS>
 void ResonanceSuppressorProcessor::getStateInformation (juce::MemoryBlock& destData)
 {
-    if (auto xml = apvts.copyState().createXml())
+    juce::ValueTree root ("RS");
+    root.setProperty ("activeSlot", activeSlot, nullptr);
+    root.setProperty ("preset", presets.getCurrentName(), nullptr);
+    root.appendChild (apvts.copyState(), nullptr);
+    if (const auto& other = slots[(size_t) (1 - activeSlot)]; other.isValid())
+    {
+        juce::ValueTree slot ("SLOT");
+        slot.appendChild (other.createCopy(), nullptr);
+        root.appendChild (slot, nullptr);
+    }
+
+    if (auto xml = root.createXml())
         copyXmlToBinary (*xml, destData);
 }
 
 void ResonanceSuppressorProcessor::setStateInformation (const void* data, int sizeInBytes)
 {
-    if (auto xml = getXmlFromBinary (data, sizeInBytes))
-        if (xml->hasTagName (apvts.state.getType()))
-            apvts.replaceState (juce::ValueTree::fromXml (*xml));
+    auto xml = getXmlFromBinary (data, sizeInBytes);
+    if (xml == nullptr)
+        return;
+
+    const auto root = juce::ValueTree::fromXml (*xml);
+    if (root.hasType (apvts.state.getType())) // bare APVTS state
+    {
+        apvts.replaceState (root);
+        return;
+    }
+    if (! root.hasType ("RS"))
+        return;
+
+    if (const auto current = root.getChildWithName (apvts.state.getType()); current.isValid())
+        apvts.replaceState (current);
+    activeSlot = juce::jlimit (0, 1, (int) root.getProperty ("activeSlot", 0));
+    slots[(size_t) (1 - activeSlot)] = root.getChildWithName ("SLOT").getChildWithName (apvts.state.getType()).createCopy();
+    undoManager.clearUndoHistory();
 }
 
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()

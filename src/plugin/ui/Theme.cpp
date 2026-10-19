@@ -4,6 +4,16 @@ namespace rs::ui
 {
 LookAndFeel::LookAndFeel()
 {
+    setColourScheme (getLightColourScheme());
+    setColour (juce::TextButton::buttonColourId, colours::panel);
+    setColour (juce::TextButton::buttonOnColourId, colours::ink);
+    setColour (juce::TextButton::textColourOffId, colours::ink);
+    setColour (juce::TextButton::textColourOnId, colours::panel);
+    setColour (juce::AlertWindow::backgroundColourId, colours::panel);
+    setColour (juce::AlertWindow::textColourId, colours::ink);
+    setColour (juce::TextEditor::backgroundColourId, colours::background);
+    setColour (juce::TextEditor::textColourId, colours::ink);
+    setColour (juce::TextEditor::outlineColourId, colours::panelEdge);
     setColour (juce::ResizableWindow::backgroundColourId, colours::background);
     setColour (juce::Label::textColourId, colours::ink);
     setColour (juce::ComboBox::backgroundColourId, colours::panel);
@@ -52,6 +62,19 @@ void LookAndFeel::drawRotarySlider (juce::Graphics& g, int x, int y, int w, int 
     const auto base = centre.getPointOnCircumference (face * 0.35f, angle);
     g.setColour (colours::ink);
     g.drawLine ({ base, tip }, juce::jmax (1.5f, stroke * 0.6f));
+}
+
+void LookAndFeel::drawButtonBackground (juce::Graphics& g, juce::Button& b, const juce::Colour&, bool highlighted, bool down)
+{
+    const auto r = b.getLocalBounds().toFloat().reduced (1.0f);
+    const bool on = b.getToggleState();
+    auto fill = on ? colours::ink : colours::panel;
+    if (! on && (highlighted || down))
+        fill = colours::track;
+    g.setColour (b.isEnabled() ? fill : colours::background);
+    g.fillRoundedRectangle (r, 5.0f);
+    g.setColour (on ? colours::ink : colours::panelEdge);
+    g.drawRoundedRectangle (r, 5.0f, 1.0f);
 }
 
 void LookAndFeel::drawToggleButton (juce::Graphics& g, juce::ToggleButton& b, bool highlighted, bool)

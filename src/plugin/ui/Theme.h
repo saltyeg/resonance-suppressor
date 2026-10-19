@@ -26,6 +26,8 @@ public:
     LookAndFeel();
 
     void drawRotarySlider (juce::Graphics&, int x, int y, int w, int h, float pos, float start, float end, juce::Slider&) override;
+    void drawButtonBackground (juce::Graphics&, juce::Button&, const juce::Colour&, bool highlighted, bool down) override;
+    juce::Font getTextButtonFont (juce::TextButton&, int) override { return juce::FontOptions (13.0f); }
     void drawToggleButton (juce::Graphics&, juce::ToggleButton&, bool highlighted, bool down) override;
     void drawComboBox (juce::Graphics&, int w, int h, bool down, int bx, int by, int bw, int bh, juce::ComboBox&) override;
     juce::Font getComboBoxFont (juce::ComboBox&) override { return juce::FontOptions (13.0f); }

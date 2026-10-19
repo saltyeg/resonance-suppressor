@@ -37,12 +37,6 @@ ResonanceSuppressorEditor::ResonanceSuppressorEditor (ResonanceSuppressorProcess
     addAndMakeVisible (bandOverlay);
 
     // Mode: two radio-style buttons driving the choice parameter.
-    auto* modeParam = p.apvts.getParameter (ids::mode);
-    auto syncMode = [this, modeParam] {
-        const bool hard = modeParam->getValue() > 0.5f;
-        softButton.setToggleState (! hard, juce::dontSendNotification);
-        hardButton.setToggleState (hard, juce::dontSendNotification);
-    };
     for (auto* b : { &softButton, &hardButton })
     {
         addAndMakeVisible (*b);
@@ -52,9 +46,45 @@ ResonanceSuppressorEditor::ResonanceSuppressorEditor (ResonanceSuppressorProcess
     hardButton.setButtonText ("hard");
     softButton.setTooltip ("Adaptive threshold: reacts to tonal balance, largely level independent");
     hardButton.setTooltip ("Fixed threshold: louder material is cut harder");
-    softButton.onClick = [modeParam, syncMode] { modeParam->setValueNotifyingHost (0.0f); syncMode(); };
-    hardButton.onClick = [modeParam, syncMode] { modeParam->setValueNotifyingHost (1.0f); syncMode(); };
-    syncMode();
+    modeAttachment = std::make_unique<juce::ParameterAttachment> (*p.apvts.getParameter (ids::mode), [this] (float v) {
+        softButton.setToggleState (v < 0.5f, juce::dontSendNotification);
+        hardButton.setToggleState (v >= 0.5f, juce::dontSendNotification);
+    }, &p.undoManager);
+    softButton.onClick = [this] { modeAttachment->setValueAsCompleteGesture (0.0f); };
+    hardButton.onClick = [this] { modeAttachment->setValueAsCompleteGesture (1.0f); };
+    modeAttachment->sendInitialUpdate();
+
+    // Presets
+    presetBox.setTextWhenNothingSelected ("presets");
+    presetBox.setTooltip ("Factory and user presets");
+    presetBox.onChange = [this] {
+        const int id = presetBox.getSelectedId();
+        if (id <= 0)
+            return;
+        if (id < 1000)
+            processor.presets.loadFactory (presetBox.getItemText (presetBox.getSelectedItemIndex()));
+        else
+            processor.presets.loadUser (presetBox.getItemText (presetBox.getSelectedItemIndex()));
+        processor.undoManager.clearUndoHistory();
+    };
+    addAndMakeVisible (presetBox);
+    refreshPresetList();
+
+    addButton (saveButton, "save", "Save the current settings as a user preset", [this] { savePresetDialog(); });
+    addButton (deleteButton, "delete", "Delete the selected user preset", [this] {
+        if (presetBox.getSelectedId() >= 1000)
+        {
+            processor.presets.deleteUser (presetBox.getText());
+            refreshPresetList();
+        }
+    });
+    addButton (aButton, "A", "Settings slot A", [this] { processor.switchToSlot (0); refreshAB(); });
+    addButton (bButton, "B", "Settings slot B", [this] { processor.switchToSlot (1); refreshAB(); });
+    addButton (copyButton, "copy", "Copy the active slot to the other one", [this] { processor.copyActiveToOther(); });
+    addButton (undoButton, "undo", "Undo (Ctrl+Z)", [this] { processor.undoManager.undo(); });
+    addButton (redoButton, "redo", "Redo (Ctrl+Shift+Z)", [this] { processor.undoManager.redo(); });
+    refreshAB();
+    startTimerHz (5);
 
     addToggle (linearButton, linearAttachment, ids::linearPhase, "linear phase");
     addToggle (lowLatencyButton, lowLatencyAttachment, ids::lowLatency, "zero latency");
@@ -95,8 +125,8 @@ ResonanceSuppressorEditor::ResonanceSuppressorEditor (ResonanceSuppressorProcess
     listenAttachment = std::make_unique<ButtonAttachment> (p.apvts, ids::sidechainListen, listenButton);
 
     setResizable (true, true);
-    setResizeLimits (720, 460, 2000, 1300);
-    setSize (980, 600);
+    setResizeLimits (820, 500, 2000, 1300);
+    setSize (1000, 640);
 }
 
 ResonanceSuppressorEditor::~ResonanceSuppressorEditor()
@@ -113,6 +143,83 @@ void ResonanceSuppressorEditor::addToggle (juce::ToggleButton& b, std::unique_pt
     attachment = std::make_unique<ButtonAttachment> (processor.apvts, paramId, b);
 }
 
+void ResonanceSuppressorEditor::addButton (juce::TextButton& b, const juce::String& text, const juce::String& tooltip, std::function<void()> onClick)
+{
+    b.setButtonText (text);
+    b.setTooltip (tooltip);
+    b.onClick = std::move (onClick);
+    addAndMakeVisible (b);
+}
+
+void ResonanceSuppressorEditor::refreshPresetList()
+{
+    presetBox.clear (juce::dontSendNotification);
+    presetBox.addSectionHeading ("Factory");
+    int id = 1;
+    for (const auto& name : processor.presets.getFactoryNames())
+        presetBox.addItem (name, id++);
+    const auto user = processor.presets.getUserNames();
+    if (! user.isEmpty())
+    {
+        presetBox.addSectionHeading ("User");
+        id = 1000;
+        for (const auto& name : user)
+            presetBox.addItem (name, id++);
+    }
+
+    // Show the current preset's name without reloading it.
+    const auto current = processor.presets.getCurrentName();
+    for (int i = 0; i < presetBox.getNumItems(); ++i)
+        if (presetBox.getItemText (i) == current)
+            presetBox.setSelectedItemIndex (i, juce::dontSendNotification);
+}
+
+void ResonanceSuppressorEditor::savePresetDialog()
+{
+    saveDialog = std::make_unique<juce::AlertWindow> ("Save preset", "Name for the new user preset:", juce::MessageBoxIconType::NoIcon, this);
+    saveDialog->addTextEditor ("name", processor.presets.getCurrentName());
+    saveDialog->addButton ("Save", 1, juce::KeyPress (juce::KeyPress::returnKey));
+    saveDialog->addButton ("Cancel", 0, juce::KeyPress (juce::KeyPress::escapeKey));
+    saveDialog->enterModalState (true, juce::ModalCallbackFunction::create ([this] (int result) {
+        if (result == 1 && saveDialog != nullptr)
+        {
+            processor.presets.saveUser (saveDialog->getTextEditorContents ("name"));
+            refreshPresetList();
+        }
+        saveDialog.reset();
+    }));
+}
+
+void ResonanceSuppressorEditor::refreshAB()
+{
+    const int slot = processor.getActiveSlot();
+    aButton.setToggleState (slot == 0, juce::dontSendNotification);
+    bButton.setToggleState (slot == 1, juce::dontSendNotification);
+    copyButton.setButtonText (slot == 0 ? "A > B" : "B > A");
+}
+
+void ResonanceSuppressorEditor::timerCallback()
+{
+    undoButton.setEnabled (processor.undoManager.canUndo());
+    redoButton.setEnabled (processor.undoManager.canRedo());
+}
+
+void ResonanceSuppressorEditor::mouseDown (const juce::MouseEvent&)
+{
+    // Each click/drag on any control becomes one undo step.
+    processor.undoManager.beginNewTransaction();
+}
+
+bool ResonanceSuppressorEditor::keyPressed (const juce::KeyPress& key)
+{
+    if (key == juce::KeyPress ('z', juce::ModifierKeys::commandModifier, 0))
+        return processor.undoManager.undo();
+    if (key == juce::KeyPress ('z', juce::ModifierKeys::commandModifier | juce::ModifierKeys::shiftModifier, 0)
+        || key == juce::KeyPress ('y', juce::ModifierKeys::commandModifier, 0))
+        return processor.undoManager.redo();
+    return false;
+}
+
 void ResonanceSuppressorEditor::paint (juce::Graphics& g)
 {
     g.fillAll (rs::ui::colours::background);
@@ -123,7 +230,7 @@ void ResonanceSuppressorEditor::paint (juce::Graphics& g)
 
     if (panelOpen)
     {
-        const auto side = getLocalBounds().withTrimmedTop (44).removeFromRight (230).reduced (8);
+        const auto side = getLocalBounds().withTrimmedTop (78).removeFromRight (230).reduced (8);
         g.setColour (rs::ui::colours::panel);
         g.fillRoundedRectangle (side.toFloat(), 6.0f);
         g.setColour (rs::ui::colours::panelEdge);
@@ -142,22 +249,39 @@ void ResonanceSuppressorEditor::resized()
 {
     auto r = getLocalBounds();
 
-    // Header
+    // Header row: title, presets, A/B, undo ... bypass, more
     auto header = r.removeFromTop (44).reduced (10, 9);
     header.removeFromLeft (200);
-    softButton.setBounds (header.removeFromLeft (52));
-    hardButton.setBounds (header.removeFromLeft (52));
+    presetBox.setBounds (header.removeFromLeft (220));
+    header.removeFromLeft (4);
+    saveButton.setBounds (header.removeFromLeft (46));
+    header.removeFromLeft (4);
+    deleteButton.setBounds (header.removeFromLeft (54));
+    header.removeFromLeft (14);
+    aButton.setBounds (header.removeFromLeft (28));
+    bButton.setBounds (header.removeFromLeft (28));
+    header.removeFromLeft (4);
+    copyButton.setBounds (header.removeFromLeft (52));
+    header.removeFromLeft (14);
+    undoButton.setBounds (header.removeFromLeft (46));
+    header.removeFromLeft (4);
+    redoButton.setBounds (header.removeFromLeft (46));
     panelButton.setBounds (header.removeFromRight (60));
-    header.removeFromRight (8);
+    header.removeFromRight (6);
     bypassButton.setBounds (header.removeFromRight (70));
-    header.removeFromRight (6);
-    deltaButton.setBounds (header.removeFromRight (60));
-    header.removeFromRight (6);
-    linearButton.setBounds (header.removeFromRight (104));
-    header.removeFromRight (6);
-    lowLatencyButton.setBounds (header.removeFromRight (100));
-    header.removeFromRight (6);
-    qualityBox.setBounds (header.removeFromRight (90));
+
+    // Toolbar row: mode ... quality, latency, phase, delta
+    auto toolbar = r.removeFromTop (34).reduced (10, 4);
+    toolbar.removeFromLeft (34);
+    softButton.setBounds (toolbar.removeFromLeft (52));
+    hardButton.setBounds (toolbar.removeFromLeft (52));
+    deltaButton.setBounds (toolbar.removeFromRight (60));
+    toolbar.removeFromRight (6);
+    linearButton.setBounds (toolbar.removeFromRight (104));
+    toolbar.removeFromRight (6);
+    lowLatencyButton.setBounds (toolbar.removeFromRight (100));
+    toolbar.removeFromRight (6);
+    qualityBox.setBounds (toolbar.removeFromRight (90));
 
     // Side panel
     for (auto* c : std::initializer_list<juce::Component*> { &detailTiltLow, &detailTiltHigh, &attackTiltLow, &attackTiltHigh,
