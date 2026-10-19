@@ -4,6 +4,10 @@
 
 A dynamic resonance suppressor VST3 in the spirit of oeksound soothe3, built with JUCE 8.
 
+## Installation
+
+Download the .[zip](https://github.com/saltyeg/resonance-suppressor/releases/tag/release) and unzip in your VST3 folder. Rescan plugins in your DAW
+
 ## Smooth Harshness, Save Time
 
 - Reduce harshness across any audio source
