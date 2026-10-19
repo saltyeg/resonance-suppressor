@@ -1,6 +1,24 @@
-# resonance-suppressor
+# Dynamic Resonance Suppressor
 
-A dynamic resonance suppressor VST3 in the spirit of oeksound soothe3, built with JUCE 8. Personal use.
+![Screenshot](image.png)
+
+A dynamic resonance suppressor VST3 in the spirit of oeksound soothe3, built with JUCE 8.
+
+## Smooth Harshness, Save Time
+
+- Reduce harshness across any audio source
+- Automatically detect and target shifting resonances
+- Clean up muddiness, boominess, and proximity effect
+- Tame shrill frequencies and piercing sibilance
+- Achieve polished sounds while tracking with zero latency
+
+This plugin dynamically identifies problematic resonances and applies targeted reduction where needed. The result is a smoother, more balanced sound without the need to manually notch out individual frequencies. By focusing reduction only on specific resonances, it preserves surrounding frequencies and the original timbre of the sound source, delivering transparent processing with minimal artifacts.
+
+Vocals contain a wide range of resonances influenced by the voice itself, microphone selection, mic placement, room acoustics, and more. This plugin smooths harshness in real time, improving clarity, balance, and overall tone without sacrificing detail. Its low-latency mode also makes it suitable for tracking, allowing performers to hear a more polished sound from the start.
+
+## Dial It In
+
+Instead of spending time manually notching out resonances, use this plugin to focus on selecting which frequencies to suppress and how much reduction to apply. Soft mode provides transparent, subtle resonance control, making it a reliable starting point for almost any sound source. Hard mode responds more aggressively to dynamic changes, delivering a stronger, compressor-like effect. It can also be pushed further for creative sound design and exaggerated resonance suppression.
 
 ## How it works
 
