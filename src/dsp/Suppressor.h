@@ -49,28 +49,28 @@ struct Params
 struct Tuning
 {
     // Detail -> widths (octaves): width = base * 2^(-detail / slope)
-    float fineOctBase = 0.33f, fineOctSlope = 2.5f;   // resolution of the detection spectrum (octaves)...
-    float fineBinsBase = 1.0f;                         // ...but never narrower than this many bins each side
-    float refOctBase = 1.2f, refOctSlope = 6.0f;      // reference envelope smoothing
-    float cutOctBase = 0.8f, cutOctSlope = 4.0f;      // smoothing of the cut curve (notch width)
-    float cutPower = 1.0f;                             // 1 = average .. large = max (keeps notch depth)
+    float fineOctBase = 0.629079f, fineOctSlope = 0.506848f;   // resolution of the detection spectrum (octaves)...
+    float fineBinsBase = 5.92463f;                         // ...but never narrower than this many bins each side
+    float refOctBase = 4.50918f, refOctSlope = 12.2716f;      // reference envelope smoothing
+    float cutOctBase = 1.00479f, cutOctSlope = 2.30059f;      // smoothing of the cut curve (notch width)
+    float cutPower = 7.99692f;                             // 1 = average .. large = max (keeps notch depth)
     // Threshold above the envelope (dB): thrBase + thrDetail * detail + thrDepth * (10 - depth)
-    float thrBase = 2.0f, thrDetail = 0.6f, thrDepth = 0.9f;
+    float thrBase = -4.84666f, thrDetail = 0.184219f, thrDepth = 4.28391f;
     // Cut: limit(depth) * (1 - exp(-ratio * over / limit)), limit = limitScale * (depth / 10)^limitExp
-    float ratio = 0.8f, limitScale = 40.0f, limitExp = 1.5f;
+    float ratio = 0.645589f, limitScale = 13.3174f, limitExp = 2.58272f;
     float knee = 3.0f;
     // Band depth (-10..10) -> sensitivity offset in dB.
     float bandScale = 1.5f;
     // Hard mode: extra "over" per dB of level above hardRef dBFS.
-    float hardGain = 0.5f, hardRef = -40.0f;
+    float hardGain = 0.533421f, hardRef = -68.7304f;
     // Ignore content this far below the frame's loudest bin.
-    float floorRange = 70.0f;
+    float floorRange = 38.5173f;
     // Reference falls back to the louder neighbourhood when the two sides differ by more than this (dB).
-    float cliffTolerance = 9.0f;
+    float cliffTolerance = 11.2833f;
     // Ballistics at 1 kHz: base * 2^(slope * knob) seconds; scaled by (1 kHz / f)^freqExp.
-    float attackBase = 0.0005f, attackSlope = 0.9f;
-    float releaseBase = 0.005f, releaseSlope = 0.75f;
-    float freqExp = 0.5f;
+    float attackBase = 0.00503863f, attackSlope = 0.776779f;
+    float releaseBase = 0.0006924f, releaseSlope = 1.9999f;
+    float freqExp = 0.544875f;
 
     // Sets a field by name; returns false for unknown names.
     bool set (const juce::String& name, float value);
