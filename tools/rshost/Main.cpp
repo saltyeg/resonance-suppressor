@@ -9,6 +9,7 @@
 //   --block <n>            processing block size (default 512)
 //   --load-state <file>    restore plugin state before applying --set
 //   --save-state <file>    write plugin state after applying --set
+//   --lenient              skip --set entries naming parameters the plugin doesn't have
 //
 // The output is compensated for the plugin's reported latency, so it lines up with the input.
 
@@ -51,7 +52,7 @@ juce::AudioProcessorParameter* findParameter (juce::AudioPluginInstance& plugin,
     return nullptr;
 }
 
-bool applySetting (juce::AudioPluginInstance& plugin, const juce::String& setting)
+bool applySetting (juce::AudioPluginInstance& plugin, const juce::String& setting, bool lenient)
 {
     const auto name = setting.upToFirstOccurrenceOf ("=", false, false).trim();
     const auto text = setting.fromFirstOccurrenceOf ("=", false, false).trim();
@@ -59,12 +60,27 @@ bool applySetting (juce::AudioPluginInstance& plugin, const juce::String& settin
     auto* param = findParameter (plugin, name);
     if (param == nullptr)
     {
-        std::cerr << "error: no parameter named '" << name << "'" << std::endl;
-        return false;
+        std::cerr << (lenient ? "warning" : "error") << ": no parameter named '" << name << "'" << std::endl;
+        return lenient;
     }
 
-    const auto norm = text.startsWithIgnoreCase ("norm:") ? text.substring (5).getFloatValue()
-                                                          : param->getValueForText (text);
+    auto norm = text.startsWithIgnoreCase ("norm:") ? text.substring (5).getFloatValue()
+                                                    : param->getValueForText (text);
+
+    // Many plugins don't implement text->value for switches/choices; match against each step's label instead.
+    const int steps = param->getNumSteps();
+    if (! text.startsWithIgnoreCase ("norm:") && steps > 1 && steps < 1000)
+    {
+        for (int k = 0; k < steps; ++k)
+        {
+            const auto v = (float) k / (float) (steps - 1);
+            if (param->getText (v, 256).trim().equalsIgnoreCase (text))
+            {
+                norm = v;
+                break;
+            }
+        }
+    }
     param->setValue (juce::jlimit (0.0f, 1.0f, norm));
     std::cout << "  " << name << " = " << param->getCurrentValueAsText() << " (norm " << param->getValue() << ")" << std::endl;
     return true;
@@ -105,6 +121,7 @@ int render (const juce::StringArray& args)
     juce::StringArray settings;
     juce::String sidechainPath, loadState, saveState;
     int blockSize = 512;
+    bool lenient = false;
 
     for (int i = 4; i < args.size(); ++i)
     {
@@ -116,6 +133,7 @@ int render (const juce::StringArray& args)
         else if (a == "--block")      blockSize = next().getIntValue();
         else if (a == "--load-state") loadState = next();
         else if (a == "--save-state") saveState = next();
+        else if (a == "--lenient")    lenient = true;
         else return fail ("unknown option " + a);
     }
 
@@ -168,7 +186,7 @@ int render (const juce::StringArray& args)
 
     std::cout << "plugin: " << plugin->getName() << std::endl;
     for (const auto& s : settings)
-        if (! applySetting (*plugin, s))
+        if (! applySetting (*plugin, s, lenient))
             return 1;
 
     if (saveState.isNotEmpty())

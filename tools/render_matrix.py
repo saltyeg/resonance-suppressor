@@ -61,10 +61,10 @@ CASES = {
     "stereo_ms": (NO_BANDS + ["Depth=8", "Stereo mode=M/S", "Stereo link=0"], ["stereo_split_peaks"]),
     "factory_default": ([], CORE_SIGNALS + REAL_SIGNALS),
     "band_bell_3k_boost": (NO_BANDS + ["Depth=5", "Band 4 used=on", "Band 4 enabled=on", "Band 4 shape=Bell",
-                                       "Band 4 frequency=norm:0.62", "Band 4 depth=norm:1"], ["pink_peaks", "pink_flat"]),
+                                       "Band 4 frequency=3100", "Band 4 depth=norm:1"], ["pink_peaks", "pink_flat"]),
     "band_bell_3k_cut": (NO_BANDS + ["Depth=5", "Band 4 used=on", "Band 4 enabled=on", "Band 4 shape=Bell",
-                                     "Band 4 frequency=norm:0.62", "Band 4 depth=norm:0"], ["pink_peaks", "pink_flat"]),
-    "band_lowcut_1k": (["Band 2 enabled=off", "Band 3 enabled=off", "Depth=8", "Band 1 frequency=norm:0.4"], ["pink_peaks", "pink_flat"]),
+                                     "Band 4 frequency=3100", "Band 4 depth=norm:0"], ["pink_peaks", "pink_flat"]),
+    "band_lowcut_1k": (["Band 2 enabled=off", "Band 3 enabled=off", "Depth=8", "Band 1 frequency=1000"], ["pink_peaks", "pink_flat"]),
     "sidechain_2k": (NO_BANDS + ["Depth=8", "Sidechain=on"], ["pink_flat"]),
 }
 SIDECHAIN = {"sidechain_2k": SYNTH / "sc_peak_2k.wav"}
@@ -96,6 +96,8 @@ def main():
             src = signal_path(sig)
             dst = out_dir / f"{sig}__{case}.wav"
             cmd = [str(HOST), "render", str(plugin), str(src), str(dst)]
+            if args.target == "ours":
+                cmd.append("--lenient")  # features we haven't built yet are skipped
             for s in settings:
                 cmd += ["--set", s]
             if case in SIDECHAIN:
@@ -104,7 +106,7 @@ def main():
             if r.returncode != 0:
                 print(f"FAIL {sig}__{case}: {r.stderr.strip() or r.stdout.strip()}")
                 continue
-            latency = next((int(l.split("latency ")[1].split()[0]) for l in r.stdout.splitlines() if "latency" in l), None)
+            latency = next((int(l.split("latency ")[1].split()[0]) for l in r.stdout.splitlines() if l.startswith("rate ")), None)
             png = None if args.no_png else dst.with_suffix(".png")
             s = analyze(src, dst, png, f"{args.target}: {sig} / {case}")
             s["latency"] = latency

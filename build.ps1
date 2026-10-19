@@ -1,7 +1,8 @@
 # Configure + build with the VS 2026 Build Tools (no Developer Prompt needed).
 #   .\build.ps1            Release build
 #   .\build.ps1 -Debug     Debug build
-param([switch]$Debug)
+#   .\build.ps1 -Target rsui   build one target
+param([switch]$Debug, [string]$Target)
 
 $ErrorActionPreference = 'Stop'
 $config = if ($Debug) { 'Debug' } else { 'Release' }
@@ -23,5 +24,5 @@ $env:PATH = "$cmakeBin\CMake\bin;$cmakeBin\Ninja;$env:PATH"
 
 cmake -S $PSScriptRoot -B $buildDir -G Ninja "-DCMAKE_BUILD_TYPE=$config"
 if ($LASTEXITCODE) { exit $LASTEXITCODE }
-cmake --build $buildDir
+if ($Target) { cmake --build $buildDir --target $Target } else { cmake --build $buildDir }
 exit $LASTEXITCODE

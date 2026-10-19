@@ -1,0 +1,16 @@
+{
+ "fineOctBase": 0.0005757584546267,
+ "fineOctSlope": 19.992204079355684,
+ "fineBinsBase": 0.8789469263708194,
+ "refOctBase": 5.997641226926456,
+ "refOctSlope": 25.577038949207704,
+ "cutOctBase": 1.3149190157409556,
+ "cutOctSlope": 3.99398809715586,
+ "thrBase": 0.6924623570111539,
+ "thrDetail": 0.5764576470605043,
+ "thrDepth": 1.8845490365793383,
+ "ratio": 1.007222629219281,
+ "limitScale": 40.0,
+ "limitExp": 1.5,
+ "floorRange": 70.0
+}

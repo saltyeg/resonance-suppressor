@@ -6,17 +6,8 @@ ResonanceSuppressorProcessor::ResonanceSuppressorProcessor()
                           .withInput ("Input", juce::AudioChannelSet::stereo(), true)
                           .withOutput ("Output", juce::AudioChannelSet::stereo(), true)
                           .withInput ("Sidechain", juce::AudioChannelSet::stereo(), false)),
-      apvts (*this, nullptr, "STATE", createLayout())
+      apvts (*this, nullptr, "STATE", rs::createParameterLayout())
 {
-}
-
-juce::AudioProcessorValueTreeState::ParameterLayout ResonanceSuppressorProcessor::createLayout()
-{
-    juce::AudioProcessorValueTreeState::ParameterLayout layout;
-    layout.add (std::make_unique<juce::AudioParameterFloat> (
-        juce::ParameterID { "outTrim", 1 }, "Out trim",
-        juce::NormalisableRange<float> (-24.0f, 24.0f, 0.01f), 0.0f));
-    return layout;
 }
 
 bool ResonanceSuppressorProcessor::isBusesLayoutSupported (const BusesLayout& layouts) const
@@ -31,8 +22,11 @@ bool ResonanceSuppressorProcessor::isBusesLayoutSupported (const BusesLayout& la
     return sc.isDisabled() || sc == juce::AudioChannelSet::mono() || sc == juce::AudioChannelSet::stereo();
 }
 
-void ResonanceSuppressorProcessor::prepareToPlay (double, int)
+void ResonanceSuppressorProcessor::prepareToPlay (double sampleRate, int)
 {
+    suppressor.setParams (parameters.read());
+    suppressor.prepare (sampleRate, getMainBusNumOutputChannels());
+    setLatencySamples (suppressor.getLatencySamples());
 }
 
 void ResonanceSuppressorProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::MidiBuffer&)
@@ -40,8 +34,24 @@ void ResonanceSuppressorProcessor::processBlock (juce::AudioBuffer<float>& buffe
     juce::ScopedNoDenormals noDenormals;
 
     auto main = getBusBuffer (buffer, true, 0);
-    const auto gain = juce::Decibels::decibelsToGain (apvts.getRawParameterValue ("outTrim")->load());
-    main.applyGain (gain);
+    suppressor.setParams (parameters.read());
+
+    // Sidechain: the second input bus drives detection when enabled and connected.
+    const bool useSidechain = parameters.sidechainEnabled() && getBusCount (true) > 1
+                              && getBus (true, 1)->isEnabled() && getBus (true, 1)->getNumberOfChannels() > 0;
+    if (useSidechain)
+    {
+        const auto sc = getBusBuffer (buffer, true, 1);
+        suppressor.process (main, &sc);
+    }
+    else
+    {
+        suppressor.process (main);
+    }
+
+    // Linear phase changes the latency; let the host know.
+    if (suppressor.getLatencySamples() != getLatencySamples())
+        setLatencySamples (suppressor.getLatencySamples());
 }
 
 juce::AudioProcessorEditor* ResonanceSuppressorProcessor::createEditor()

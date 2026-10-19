@@ -20,7 +20,8 @@ set(RS_VST3_DIR "$ENV{USERPROFILE}/VST3-dev" CACHE PATH "Where built VST3 bundle
 # ---------------------------------------------------------------- DSP core
 # Plain C++ library shared by the plugin and the command-line tools.
 add_library(rs_dsp STATIC
-    src/dsp/Placeholder.cpp)
+    src/dsp/Suppressor.cpp
+    src/dsp/Bands.cpp)
 target_include_directories(rs_dsp PUBLIC src)
 target_link_libraries(rs_dsp PUBLIC juce::juce_dsp)
 target_compile_definitions(rs_dsp PUBLIC JUCE_WEB_BROWSER=0 JUCE_USE_CURL=0)
@@ -40,14 +41,21 @@ juce_add_plugin(ResonanceSuppressor
     VST3_COPY_DIR "${RS_VST3_DIR}")
 
 target_sources(ResonanceSuppressor PRIVATE
+    src/plugin/Parameters.cpp
     src/plugin/PluginProcessor.cpp
-    src/plugin/PluginEditor.cpp)
+    src/plugin/PluginEditor.cpp
+    src/plugin/ui/Theme.cpp
+    src/plugin/ui/Knob.cpp
+    src/plugin/ui/Analyzer.cpp
+    src/plugin/ui/BandOverlay.cpp)
+target_include_directories(ResonanceSuppressor PRIVATE src/plugin)
 
 target_compile_definitions(ResonanceSuppressor PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0
     JUCE_VST3_CAN_REPLACE_VST2=0
-    JUCE_DISPLAY_SPLASH_SCREEN=0)
+    JUCE_DISPLAY_SPLASH_SCREEN=0
+    JUCE_MODAL_LOOPS_PERMITTED=1) # only used by the rsui snapshot tool
 
 target_link_libraries(ResonanceSuppressor
     PRIVATE
@@ -73,3 +81,21 @@ target_link_libraries(rshost
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags)
+
+# ---------------------------------------------------------------- DSP-only renderer (tuning / fitting)
+juce_add_console_app(rsdsp PRODUCT_NAME "rsdsp")
+target_sources(rsdsp PRIVATE tools/rsdsp/Main.cpp)
+target_link_libraries(rsdsp
+    PRIVATE
+        rs_dsp
+        juce::juce_audio_formats
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_warning_flags)
+
+# ---------------------------------------------------------------- offscreen UI snapshots
+# Links the plugin's shared code directly (no JUCE module sources of its own, to avoid duplicates).
+add_executable(rsui tools/rsui/Main.cpp)
+target_include_directories(rsui PRIVATE $<TARGET_PROPERTY:ResonanceSuppressor,INCLUDE_DIRECTORIES>)
+target_compile_definitions(rsui PRIVATE $<TARGET_PROPERTY:ResonanceSuppressor,COMPILE_DEFINITIONS>)
+target_link_libraries(rsui PRIVATE ResonanceSuppressor)
