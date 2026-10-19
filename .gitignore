@@ -1,0 +1,7 @@
+build/
+.venv/
+test-audio/
+renders/
+__pycache__/
+*.user
+.vs/
