@@ -37,7 +37,7 @@ bool Tuning::set (const juce::String& name, float value)
         { "thrBase", &thrBase },         { "thrDetail", &thrDetail },       { "thrDepth", &thrDepth },
         { "ratio", &ratio },             { "limitScale", &limitScale },     { "limitExp", &limitExp },
         { "knee", &knee },               { "bandScale", &bandScale },               { "hardGain", &hardGain },         { "hardRef", &hardRef },
-        { "floorRange", &floorRange },
+        { "floorRange", &floorRange },   { "cliffTolerance", &cliffTolerance }, { "cutPower", &cutPower },
         { "attackBase", &attackBase },   { "attackSlope", &attackSlope },
         { "releaseBase", &releaseBase }, { "releaseSlope", &releaseSlope }, { "freqExp", &freqExp },
     };
@@ -397,7 +397,10 @@ void Suppressor::computeTargets (const std::vector<float>& levelDb, const std::v
     for (int k = 1; k < numBins; ++k)
     {
         const float level = fine[(size_t) k];
-        const float ref = (float) juce::jmax (boxMean (refLeft[(size_t) k]), boxMean (refRight[(size_t) k]));
+        // Symmetric reference is neutral to spectral tilt; at a steep cliff (e.g. a lowpass edge) fall back
+        // towards the louder side so the edge isn't mistaken for a resonance.
+        const float left = (float) boxMean (refLeft[(size_t) k]), right = (float) boxMean (refRight[(size_t) k]);
+        const float ref = juce::jmax (0.5f * (left + right), juce::jmax (left, right) - t.cliffTolerance);
         float over = level - ref - threshold[(size_t) k] + sens[(size_t) k];
         if (p.mode == Mode::hard)
             over += t.hardGain * (level - t.hardRef);
@@ -412,14 +415,16 @@ void Suppressor::computeTargets (const std::vector<float>& levelDb, const std::v
         cut[(size_t) k] = (hz < 20.0f || hz > maxHz) ? 0.0f : amount * floorFade * weight;
     }
 
-    // 3. Smooth the cut across frequency so notches have a musical width.
+    // 3. Widen the cut across frequency so notches have a musical width. A power mean (between an
+    //    average and a max) widens narrow notches without diluting their depth.
+    const double power = t.cutPower;
     pre[0] = 0.0;
     for (int k = 0; k < numBins; ++k)
-        pre[(size_t) k + 1] = pre[(size_t) k] + cut[(size_t) k];
+        pre[(size_t) k + 1] = pre[(size_t) k] + std::pow ((double) cut[(size_t) k], power);
 
     cutDb[0] = 0.0f;
     for (int k = 1; k < numBins; ++k)
-        cutDb[(size_t) k] = -juce::jmin ((float) boxMean (cutRange[(size_t) k]), p.maxCutDb);
+        cutDb[(size_t) k] = -juce::jmin ((float) std::pow (boxMean (cutRange[(size_t) k]), 1.0 / power), p.maxCutDb);
 }
 
 void Suppressor::smoothGains (int ch, const std::vector<float>& targetDb)

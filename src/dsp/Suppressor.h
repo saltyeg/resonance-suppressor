@@ -53,6 +53,7 @@ struct Tuning
     float fineBinsBase = 1.0f;                         // ...but never narrower than this many bins each side
     float refOctBase = 1.2f, refOctSlope = 6.0f;      // reference envelope smoothing
     float cutOctBase = 0.8f, cutOctSlope = 4.0f;      // smoothing of the cut curve (notch width)
+    float cutPower = 1.0f;                             // 1 = average .. large = max (keeps notch depth)
     // Threshold above the envelope (dB): thrBase + thrDetail * detail + thrDepth * (10 - depth)
     float thrBase = 2.0f, thrDetail = 0.6f, thrDepth = 0.9f;
     // Cut: limit(depth) * (1 - exp(-ratio * over / limit)), limit = limitScale * (depth / 10)^limitExp
@@ -64,6 +65,8 @@ struct Tuning
     float hardGain = 0.5f, hardRef = -40.0f;
     // Ignore content this far below the frame's loudest bin.
     float floorRange = 70.0f;
+    // Reference falls back to the louder neighbourhood when the two sides differ by more than this (dB).
+    float cliffTolerance = 9.0f;
     // Ballistics at 1 kHz: base * 2^(slope * knob) seconds; scaled by (1 kHz / f)^freqExp.
     float attackBase = 0.0005f, attackSlope = 0.9f;
     float releaseBase = 0.005f, releaseSlope = 0.75f;

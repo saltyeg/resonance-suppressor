@@ -40,10 +40,11 @@ STAGES = {
             # name: (initial, lo, hi)
             "fineOctBase": (0.05, 0.0, 1.0), "fineOctSlope": (2.5, 0.5, 20.0), "fineBinsBase": (1.0, 0.0, 6.0),
             "refOctBase": (1.2, 0.1, 6.0), "refOctSlope": (6.0, 0.5, 40.0),
-            "cutOctBase": (0.8, 0.01, 3.0), "cutOctSlope": (4.0, 0.5, 40.0),
+            "cutOctBase": (0.8, 0.01, 3.0), "cutOctSlope": (4.0, 0.5, 40.0), "cutPower": (3.0, 1.0, 8.0),
             "thrBase": (2.0, -10.0, 20.0), "thrDetail": (0.6, -2.0, 3.0), "thrDepth": (0.9, 0.0, 5.0),
             "ratio": (0.8, 0.05, 5.0), "limitScale": (40.0, 3.0, 80.0), "limitExp": (1.5, 0.2, 5.0),
-            "floorRange": (70.0, 20.0, 120.0),
+            "floorRange": (70.0, 20.0, 120.0), "cliffTolerance": (9.0, 1.0, 40.0),
+            "attackBase": (0.0005, 1e-5, 0.05), "releaseBase": (0.005, 1e-4, 0.5), "freqExp": (0.5, 0.0, 1.5),
         },
     },
     "ballistics": {
@@ -168,6 +169,27 @@ def plot(filters):
     print(f"mean loss {np.mean(losses):.3f} -> {out}")
 
 
+def bake():
+    """Write tools/tuning.json into the Tuning defaults in src/dsp/Suppressor.h."""
+    import re
+
+    def literal(v):
+        s = f"{v:.6g}"
+        if "." not in s and "e" not in s:
+            s += ".0"  # "40f" is not a valid float literal
+        return s + "f"
+
+    header = ROOT / "src/dsp/Suppressor.h"
+    text = header.read_text()
+    for key, value in load_tuning().items():
+        pattern = re.compile(rf"(\b{key} = )-?[0-9.]+(?:e-?[0-9]+)?f")
+        text, n = pattern.subn(lambda m: m.group(1) + literal(value), text)
+        if n != 1:
+            print(f"warning: {key} matched {n} times")
+    header.write_text(text)
+    print(f"baked {len(load_tuning())} constants into {header}")
+
+
 def evaluate():
     t = load_tuning()
     cases = sorted({c for st in STAGES.values() for c in st["cases"]})
@@ -181,6 +203,8 @@ if __name__ == "__main__":
     arg = sys.argv[1] if len(sys.argv) > 1 else "eval"
     if arg == "eval":
         evaluate()
+    elif arg == "bake":
+        bake()
     elif arg == "plot":
         plot(sys.argv[2:])
     else:
