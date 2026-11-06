@@ -14,8 +14,16 @@ FetchContent_Declare(
     GIT_SHALLOW TRUE)
 FetchContent_MakeAvailable(JUCE)
 
-# Dev install folder; add it to FL Studio's plugin search paths once.
-set(RS_VST3_DIR "$ENV{USERPROFILE}/VST3-dev" CACHE PATH "Where built VST3 bundles are copied")
+# Dev install folder. On Windows add it to FL Studio's plugin search paths once;
+# elsewhere default to the standard per-user VST3 folder (build.sh overrides this to the build dir).
+if(WIN32)
+    set(_rs_default_vst3_dir "$ENV{USERPROFILE}/VST3-dev")
+elseif(APPLE)
+    set(_rs_default_vst3_dir "$ENV{HOME}/Library/Audio/Plug-Ins/VST3")
+else()
+    set(_rs_default_vst3_dir "$ENV{HOME}/.vst3")
+endif()
+set(RS_VST3_DIR "${_rs_default_vst3_dir}" CACHE PATH "Where built VST3 bundles are copied")
 
 # ---------------------------------------------------------------- DSP core
 # Plain C++ library shared by the plugin and the command-line tools.
